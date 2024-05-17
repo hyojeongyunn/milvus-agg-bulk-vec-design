@@ -496,7 +496,6 @@ func (t *searchTask) Execute(ctx context.Context) error {
 	return nil
 }
 
-// FIXME:
 func (t *searchTask) reduceResults(ctx context.Context, toReduceResults []*internalpb.SearchResults, nq, topK int64, offset int64, queryInfo *planpb.QueryInfo) (*milvuspb.SearchResults, error) {
 	metricType := ""
 	if len(toReduceResults) >= 1 {
@@ -610,10 +609,35 @@ func (t *searchTask) PostExecute(ctx context.Context) error {
 			log.Warn("rank search result failed", zap.Error(err))
 			return err
 		}
-	} else { // FIXME: single
-		t.result, err = t.reduceResults(t.ctx, toReduceResults, t.SearchRequest.Nq, t.SearchRequest.GetTopk(), t.SearchRequest.GetOffset(), t.queryInfos[0])
-		if err != nil {
-			return err
+	} else { //TODO:
+		BulkAggType := paramtable.Get().ProxyCfg.BulkAggType.GetValue()
+		IsGroupBy := t.queryInfos[0].GroupByFieldId > 0
+		log.Debug("Bulk Agg reached",
+			zap.String("BulkAggType", BulkAggType))
+
+		if BulkAggType == "sum" && IsGroupBy {
+			result := make([]*milvuspb.SearchResults, 1)
+			log.Debug("result array made")
+			result[0], err = t.reduceResults(t.ctx, toReduceResults, t.SearchRequest.Nq, t.SearchRequest.GetTopk(), t.SearchRequest.GetOffset(), t.queryInfos[0])
+			if err != nil {
+				return err
+			}
+			log.Debug("finished reduced, entering aggregation")
+
+			t.result, err = AggSearchResultData(ctx, t.SearchRequest.GetNq(),
+				t.SearchRequest.GetTopk(), t.SearchRequest.GetOffset(),
+				primaryFieldSchema.GetDataType(),
+				result)
+			log.Debug("finished aggregation")
+			if err != nil {
+				log.Warn("agg rank search result failed", zap.Error(err))
+				return err
+			}
+		} else {
+			t.result, err = t.reduceResults(t.ctx, toReduceResults, t.SearchRequest.Nq, t.SearchRequest.GetTopk(), t.SearchRequest.GetOffset(), t.queryInfos[0])
+			if err != nil {
+				return err
+			}
 		}
 	}
 

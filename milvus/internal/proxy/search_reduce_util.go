@@ -69,7 +69,6 @@ func reduceSearchResult(ctx context.Context, reduceInfo *reduceSearchResultInfo)
 		reduceInfo.offset)
 }
 
-// FIXME:
 func reduceSearchResultDataWithGroupBy(ctx context.Context, subSearchResultData []*schemapb.SearchResultData, nq int64, topk int64, metricType string, pkType schemapb.DataType, offset int64) (*milvuspb.SearchResults, error) {
 	tr := timerecord.NewTimeRecorder("reduceSearchResultData")
 	defer func() {
@@ -148,7 +147,6 @@ func reduceSearchResultDataWithGroupBy(ctx context.Context, subSearchResultData 
 	maxOutputSize := paramtable.Get().QuotaConfig.MaxOutputSize.GetAsInt64()
 
 	// reducing nq * topk results
-	// TODO: how to aggregate nq results by aggreate function (e.g., sum, max, min) for each groupby value
 	for i := int64(0); i < nq; i++ {
 		var (
 			// cursor of current data of each subSearch for merging the j-th data of TopK.
@@ -203,7 +201,6 @@ func reduceSearchResultDataWithGroupBy(ctx context.Context, subSearchResultData 
 				}
 			} else {
 				// skip entity with same id
-				// TODO: (QUESTION) Is this block possible? when & why?
 				skipDupCnt++
 			}
 			cursors[subSearchIdx]++
@@ -385,7 +382,6 @@ func reduceSearchResultDataNoGroupBy(ctx context.Context, subSearchResultData []
 	return ret, nil
 }
 
-// FIXME:
 func rankSearchResultData(ctx context.Context,
 	nq int64,
 	params *rankParams,
@@ -437,9 +433,9 @@ func rankSearchResultData(ctx context.Context,
 	}
 
 	// []map[id]score
-	accumulatedScores := make([]map[interface{}]float32, nq) // total nq, slice
+	accumulatedScores := make([]map[interface{}]float32, nq)
 	for i := int64(0); i < nq; i++ {
-		accumulatedScores[i] = make(map[interface{}]float32) // (any type, float32) mapping
+		accumulatedScores[i] = make(map[interface{}]float32)
 	}
 
 	for _, result := range searchResults {
@@ -449,10 +445,7 @@ func rankSearchResultData(ctx context.Context,
 			realTopk := result.GetResults().Topks[i]
 			for j := start; j < start+realTopk; j++ {
 				id := typeutil.GetPK(result.GetResults().GetIds(), j)
-				//sum
-				accumulatedScores[i][id] += scores[j] // mapping에 id를 key로 score를 저장한다.
-				// TODO: max, min, avg(?)
-				// consideration: if the initial value might not exist, so the code to handle that is needed.
+				accumulatedScores[i][id] += scores[j]
 			}
 			start += realTopk
 		}
@@ -498,7 +491,6 @@ func rankSearchResultData(ctx context.Context,
 		// append id and score
 		for index := offset; index < int64(len(keys)); index++ {
 			typeutil.AppendPKs(ret.Results.Ids, keys[index])
-
 			score := idSet[keys[index]]
 			if roundDecimal != -1 {
 				multiplier := math.Pow(10.0, float64(roundDecimal))
@@ -508,6 +500,124 @@ func rankSearchResultData(ctx context.Context,
 		}
 	}
 
+	return ret, nil
+}
+
+func AggSearchResultData(ctx context.Context,
+	nq int64,
+	topK int64,
+	offset int64,
+	pkType schemapb.DataType,
+	searchResults []*milvuspb.SearchResults,
+) (*milvuspb.SearchResults, error) {
+	tr := timerecord.NewTimeRecorder("AggSearchResultData")
+	defer func() {
+		tr.CtxElapse(ctx, "done")
+	}()
+
+	log.Ctx(ctx).Debug("AggSearchResultData",
+		zap.Int("len(searchResults)", len(searchResults)),
+		zap.Int64("nq", nq),
+		zap.Int64("offset", offset),
+		zap.Int64("topk", topK))
+
+	ret := &milvuspb.SearchResults{
+		Status: merr.Success(),
+		Results: &schemapb.SearchResultData{
+			NumQueries: nq,
+			TopK:       topK,
+			FieldsData: make([]*schemapb.FieldData, 0),
+			Scores:     []float32{},
+			Ids:        &schemapb.IDs{},
+			Topks:      []int64{},
+		},
+	}
+
+	switch pkType {
+	case schemapb.DataType_Int64:
+		ret.GetResults().Ids.IdField = &schemapb.IDs_IntId{
+			IntId: &schemapb.LongArray{
+				Data: make([]int64, 0),
+			},
+		}
+	case schemapb.DataType_VarChar:
+		ret.GetResults().Ids.IdField = &schemapb.IDs_StrId{
+			StrId: &schemapb.StringArray{
+				Data: make([]string, 0),
+			},
+		}
+	default:
+		return nil, errors.New("unsupported pk type")
+	}
+
+	// map[id]score
+	accumulatedScore := make(map[interface{}]float32)
+	// idSet := make([]interface{}, 0)
+
+	for _, result := range searchResults {
+		scores := result.GetResults().GetScores()
+		start := int64(0)
+		for i := int64(0); i < nq; i++ {
+			realTopk := result.GetResults().Topks[i]
+			for j := start; j < start+realTopk; j++ {
+				// id := typeutil.GetPK(result.GetResults().GetIds(), j)
+				groupByVal := typeutil.GetData(result.GetResults().GetGroupByFieldValue(), int(j))
+
+				if groupByVal == nil {
+					return nil, errors.New("get nil groupByVal from subSearchRes, wrong states, as milvus doesn't support nil value," +
+						"there must be sth wrong on queryNode side")
+				}
+				accumulatedScore[groupByVal] += scores[j]
+				// idSet = append(idSet, id)
+			}
+			start += realTopk
+		}
+	}
+
+	keys := make([]interface{}, 0)
+	for key := range accumulatedScore {
+		keys = append(keys, key)
+	}
+	if int64(len(keys)) <= offset {
+		ret.Results.Topks = append(ret.Results.Topks, 0)
+		return nil, errors.New("too large offset")
+	}
+
+	compareKeys := func(keyI, keyJ interface{}) bool {
+		switch keyI.(type) {
+		case int64:
+			return keyI.(int64) < keyJ.(int64)
+		case string:
+			return keyI.(string) < keyJ.(string)
+		}
+		return false
+	}
+
+	// sort groupByVal by score
+	big := func(i, j int) bool {
+		if accumulatedScore[keys[i]] == accumulatedScore[keys[j]] {
+			return compareKeys(keys[i], keys[j])
+		}
+		return accumulatedScore[keys[i]] > accumulatedScore[keys[j]]
+	}
+
+	sort.Slice(keys, big)
+
+	if int64(len(keys)) > topK {
+		keys = keys[:topK]
+	}
+
+	// set real topk
+	ret.Results.Topks = append(ret.Results.Topks, int64(len(keys))-offset)
+	// append id and score
+	for index := offset; index < int64(len(keys)); index++ {
+		typeutil.AppendPKs(ret.Results.Ids, keys[index]) // FIXME: type checking
+		score := accumulatedScore[keys[index]]
+		ret.Results.Scores = append(ret.Results.Scores, score)
+	}
+
+	// For aggregated computation,
+	// we replace pk with group_by_field_value
 	return ret, nil
 }
 
