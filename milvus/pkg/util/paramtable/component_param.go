@@ -979,17 +979,16 @@ type proxyConfig struct {
 	// Alias  string
 	SoPath ParamItem `refreshable:"false"`
 
-	TimeTickInterval         ParamItem `refreshable:"false"`
-	HealthCheckTimeout       ParamItem `refreshable:"true"`
-	MsgStreamTimeTickBufSize ParamItem `refreshable:"true"`
-	MaxNameLength            ParamItem `refreshable:"true"`
-	MaxUsernameLength        ParamItem `refreshable:"true"`
-	MinPasswordLength        ParamItem `refreshable:"true"`
-	MaxPasswordLength        ParamItem `refreshable:"true"`
-	MaxFieldNum              ParamItem `refreshable:"true"`
-	MaxVectorFieldNum        ParamItem `refreshable:"true"`
-	// TODO: add aggregation config
-	// AggregationType ParamItem `refreshable:"true"`
+	TimeTickInterval             ParamItem `refreshable:"false"`
+	HealthCheckTimeout           ParamItem `refreshable:"true"`
+	MsgStreamTimeTickBufSize     ParamItem `refreshable:"true"`
+	MaxNameLength                ParamItem `refreshable:"true"`
+	MaxUsernameLength            ParamItem `refreshable:"true"`
+	MinPasswordLength            ParamItem `refreshable:"true"`
+	MaxPasswordLength            ParamItem `refreshable:"true"`
+	MaxFieldNum                  ParamItem `refreshable:"true"`
+	MaxVectorFieldNum            ParamItem `refreshable:"true"`
+	BulkAggType                  ParamItem `refreshable:"true"`
 	MaxShardNum                  ParamItem `refreshable:"true"`
 	MaxDimension                 ParamItem `refreshable:"true"`
 	GinLogging                   ParamItem `refreshable:"false"`
@@ -1108,16 +1107,15 @@ So adjust at your risk!`,
 		panic(fmt.Sprintf("Maximum number of vector fields in a collection should be in (0, 10], not %d", p.MaxVectorFieldNum.GetAsInt()))
 	}
 
-	// TODO: AggregationType
-	// p.AggregationType = ParamItem{
-	// 	Key:          "proxy.AggregationType",
-	// 	Version:      "2.4.0",
-	// 	DefaultValue: "sum",
-	// 	PanicIfEmpty: true,
-	// 	Doc:          "Type of the aggregation function.",
-	// 	Export:       true,
-	// }
-	// p.AggregationType.Init(base.mgr)
+	p.BulkAggType = ParamItem{
+		Key:          "proxy.BulkAggType",
+		Version:      "2.4.0",
+		DefaultValue: "none", // invalid, none, sum, max
+		PanicIfEmpty: true,
+		Doc:          "Aggregation function type for bulk-search",
+		Export:       true,
+	}
+	p.BulkAggType.Init(base.mgr)
 
 	p.MaxShardNum = ParamItem{
 		Key:          "proxy.maxShardNum",

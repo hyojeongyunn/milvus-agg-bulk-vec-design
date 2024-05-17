@@ -142,7 +142,7 @@ func TestComponentParam(t *testing.T) {
 
 		t.Logf("MaxVectorFieldNum: %d", Params.MaxVectorFieldNum.GetAsInt64())
 
-		// t.Logf("AggregationType: %d", Params.AggregationType.GetAsInt64())
+		t.Logf("BulkAggType: %v", Params.BulkAggType)
 
 		t.Logf("MaxShardNum: %d", Params.MaxShardNum.GetAsInt64())
 
