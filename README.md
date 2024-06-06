@@ -24,7 +24,7 @@ In this project, we want to eliminate post-processing step in user-side.
     - Input: $Q=( q_1, \cdots, q_\mu ), D=\{ (v_1, \cdots, v_\mu)_1, \cdots, (v_1, \cdots, v_\mu)_{|D|} \}, k$
     - Output: $\{ ( v_1, \cdots, v_\mu )_1, \cdots, ( v_1, \cdots, v_\mu )_k \}$
 
-- Our algorithm
+- Aggregation Algorithm
     - Input: $Q=( q_1, \cdots, q_\mu ), D=\{ (v_1, \cdots, v_\mu)_1, \cdots, (v_1, \cdots, v_\mu)_{|D|} \}, k$
     - Current output: $\begin{Bmatrix}
 \{ (v_1, id_1), & \cdots, & (v_k, id_k)\}_1\\
@@ -32,10 +32,8 @@ In this project, we want to eliminate post-processing step in user-side.
 \{ (v_1, id_1), & \cdots, & (v_k, id_k)\}_\lambda\\
 \end{Bmatrix}$
     - Our goal: $ \{ id_1, \cdots, id_k \} $
-
-The main algorithm for aggregation is inherited the strategy of [NRA algorithm](https://www.wisdom.weizmann.ac.il/~naor/PAPERS/middle_agg.pdf) (top-k algorithm for relational database)
-
-![algorithm](./asset/algorithm.png)
+    - The main algorithm for aggregation is inherited the strategy of [NRA algorithm](https://www.wisdom.weizmann.ac.il/~naor/PAPERS/middle_agg.pdf) (top-k algorithm for relational database)
+    - ![algorithm](./asset/algorithm.png)
 
 
 ### Code-level
@@ -57,8 +55,8 @@ Compatible with `v2.4.0`.
 
 ## Test Plan
 
-Correctness aspects
-- Verify the ability of aggregation functions (where it does share the same embedding space) [✔]
+Correctness aspects [✔]
+- Verify the ability of aggregation functions (where it does share the same embedding space)
     - TestTaskSearch_AggSearchResultData - internal/proxy/task_search_test.go
     - execute python-query/test_aggregation.py
 
