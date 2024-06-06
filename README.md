@@ -1,7 +1,7 @@
 # Advanced Multi-Vector Query Processing in Milvus
 
 ## Summary
-Support aggregation results of multiple query vectors.
+Support aggregating results of multiple query vectors.
 
 ## Background
 Multi-vector search is finding k similiar sets of vectors from given a set of vectors (query) among the collection of set of vectors.  
@@ -39,15 +39,16 @@ The main algorithm for aggregation is inherited the strategy of [NRA algorithm](
 
 
 ### Code-level
-Lists of API/struct to be modified
+Lists of API/struct to modifed
 1. PostExecute - internal/proxy/task_search.go
-2. type proxyConfig struct - pkg/util/paramtable
+2. type proxyConfig struct - pkg/util/paramtable/component_param.go
 
-Lists of APISs to be added
+Lists of APIs to appended
 1. AggSearchResultData - internal/proxy/search_reduce_util.go
 
-New test code
+New/Added test code
 1. TestTaskSearch_AggSearchResultData - internal/proxy/task_search_test.go
+2. TestComponentParam - pkg/util/paramtable/component_param_test.go
 
 ## Compatibility, Deprecation, and Migration Plan(optional)
 
