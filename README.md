@@ -81,3 +81,4 @@ Performance aspects [✔]
 
 ## References
 [hybrid_search; control the result based on score](https://stackoverflow.com/questions/76489090/in-weaviate-hybrid-search-is-there-a-way-to-control-the-results-based-on-score)
+[multi-vector search in hnswlib](https://github.com/nmslib/hnswlib/issues/534)
